@@ -1,9 +1,5 @@
 import "./App.css";
 
-const foo = "bar";
-
-console.log(foo);
-
 function App() {
   // Create array of three todos
   const todos = [
