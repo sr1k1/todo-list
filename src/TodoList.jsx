@@ -1,3 +1,5 @@
+import TodoListItem from "./TodoListItem";
+
 function TodoList() {
   // Create array of three todos
   const todos = [
@@ -8,8 +10,8 @@ function TodoList() {
 
   return (
     <ul>
-      {todos.map((obj) => (
-        <li key={obj.id}>{obj.title}</li>
+      {todos.map((todo) => (
+        <TodoListItem key={todo.id} todo={todo} />
       ))}
     </ul>
   );
