@@ -1,20 +1,20 @@
-import { useRef } from "react";
+import { useState, useRef } from "react";
 
 function TodoForm({ onAddTodo }) {
+  // Create state variable for title
+  const [workingTodoTitle, setWorkingTodoTitle] = useState("");
+
   // Define ref to allow for refocusing onto field
   const todoTitleInput = useRef("");
 
   function handleAddTodo(event) {
     event.preventDefault();
 
-    // extract title from input form
-    const title = event.target.title.value;
-
     // pass title into onAddTodo, which will then update todoList
-    onAddTodo(title);
+    onAddTodo(workingTodoTitle);
 
     // reset input field value to empty string for fresh input
-    event.target.title.value = "";
+    setWorkingTodoTitle("");
 
     // Regain focus onto the current property of the ref
     todoTitleInput.current.focus();
@@ -29,9 +29,13 @@ function TodoForm({ onAddTodo }) {
         type="text"
         id="todoTitle"
         name="title"
+        value={workingTodoTitle}
+        onChange={(event) => {
+          setWorkingTodoTitle(event.target.value);
+        }}
         ref={todoTitleInput}
       ></input>
-      <button>Add Todo</button>
+      <button disabled={workingTodoTitle === ""}>Add Todo</button>
     </form>
   );
 }
