@@ -8,7 +8,7 @@ import TodoList from "./features/TodoList/TodoList.jsx";
 function App() {
   const [todoList, setTodoList] = useState([]);
 
-  // handler function
+  // handler functions
   function addTodo(title) {
     const newTodo = {
       title,
@@ -18,6 +18,16 @@ function App() {
 
     setTodoList([...todoList, newTodo]);
 
+    return;
+  }
+
+  function updateTodo(editedTodo) {
+    const updatedTodos = todoList.map((todo) => {
+      return todo.id === editedTodo.id ? editedTodo : todo;
+    });
+
+    // Set the current set of todos to the updated list
+    setTodoList(updatedTodos);
     return;
   }
 
@@ -36,7 +46,11 @@ function App() {
     <div>
       <h1>ToDo List</h1>
       <TodoForm onAddTodo={addTodo} />
-      <TodoList todoList={todoList} onCompleteTodo={completeTodo} />
+      <TodoList
+        todoList={todoList}
+        onCompleteTodo={completeTodo}
+        onUpdateTodo={updateTodo}
+      />
     </div>
   );
 }
