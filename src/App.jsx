@@ -6,6 +6,10 @@ import TodoForm from "./features/TodoList/TodoForm.jsx";
 import TodoList from "./features/TodoList/TodoList.jsx";
 
 function App() {
+  // --------------- Fetch todos from Airtable --------------- //
+  const url = `https://api.airtable.com/v0/${import.meta.env.VITE_BASE_ID}/${import.meta.env.VITE_TABLE_NAME}`;
+  const token = `Bearer ${import.meta.env.VITE_PAT}`;
+
   // --------------- State variables and updater functions --------------- //
   // Todo List
   const [todoList, setTodoList] = useState([]);
@@ -19,40 +23,93 @@ function App() {
   // Tracks whether todo item is being saved to API
   const [isSaving, setIsSaving] = useState(false);
 
-  // -------------------------------------------------------------------- //
+  // ---------------- Helper Functions ----------------------------- //
+  function makePayload(isCompleted, id = null, todo = null, title = null) {
+    // Back out title first if it is not given
+    if (!todo) {
+      todo = id
+        ? todoList.find((todoItem) => {
+            return todoItem.id === id;
+          })
+        : null;
+      if (!title) {
+        title = todo ? todo.title : title;
+      }
+    } else {
+      title = todo.title;
+      id = todo.id;
+    }
 
-  // --------------- Fetch todos from Airtable --------------- //
-  const url = `https://api.airtable.com/v0/${import.meta.env.VITE_BASE_ID}/${import.meta.env.VITE_TABLE_NAME}`;
-  const token = `Bearer ${import.meta.env.VITE_PAT}`;
+    // Create payload object using the complete todo to be updated into the database
+    const payload = {
+      records: [
+        {
+          fields: {
+            title: title,
+            isCompleted: isCompleted,
+          },
+        },
+      ],
+    };
+
+    // Return the payload!
+    return payload;
+  }
+
+  function makeOptions(methodUsed, payload = null) {
+    const options = {
+      method: methodUsed,
+      headers: {
+        Authorization: token,
+        "Content-Type": "application/json",
+      },
+    };
+
+    // If payload is specified, add it to options
+    if (payload) {
+      options.body = JSON.stringify(payload);
+    }
+
+    // Return options!
+    return options;
+  }
+
+  const fetchRecords = async (options) => {
+    // Send completed todo to server using fetch
+    const resp = await fetch(url, options);
+
+    // Throw an error if we don't receive an adequate response
+    if (!resp.ok) {
+      throw new Error(resp.message);
+    }
+
+    // If the above constraints are satisfied, return the records
+    const { records } = await resp.json();
+    return records;
+  };
+
+  function handleErrorMessage(errorMessage) {
+    console.log(errorMessage);
+    setErrorMessage(errorMessage);
+  }
+  // ---------------- Effects ------------------------- //
 
   useEffect(() => {
     const fetchTodos = async () => {
       // Set isLoading to true; we are fetching data!
       setIsLoading(true);
 
-      // Create object of parameters we will use to identify type of fetch request and
-      // send token for valid authorization
-      const options = {
-        method: "GET",
-        headers: {
-          Authorization: token,
-        },
-      };
+      // Create options object with "GET" method
+      const options = makeOptions("GET");
 
       // Create try/catch/finally block to handle fetch and raise errors if anything arises
       try {
-        const resp = await fetch(url, options);
-
-        // If response is NOT okay, throw an error
-        if (!resp.ok) {
-          throw new Error(resp.message);
-        }
-        // If response is okay, proceed and process the API response
-        const data = await resp.json();
+        // Retrieve records from API
+        const records = await fetchRecords(options);
 
         // Call the map method on data above to restructure data into how
         // we have defined todos here
-        const retrievedTodoList = data.records.map((record) => {
+        const retrievedTodoList = records.map((record) => {
           const todo = {
             id: record.id,
             ...record.fields,
@@ -70,8 +127,7 @@ function App() {
 
         setTodoList(retrievedTodoList);
       } catch (error) {
-        console.log(error.message);
-        setErrorMessage(error.message);
+        handleErrorMessage(error.message);
         return;
       } finally {
         // The loading process is done, so set isLoading to false!
@@ -89,7 +145,7 @@ function App() {
   // it as such and default isCompleted to false (which also makes sense given that
   // if we are adding the todo to our list, it is an unfinished task).
   const addTodo = async (newTodoTitle) => {
-    // Create payload, which is an object that holds a records array with one todo
+    // Create payload, which here is an object that holds a records array with one todo
     const payload = {
       records: [
         {
@@ -102,29 +158,14 @@ function App() {
     };
 
     // Create an options object to hold parameters needed to push data into AirTable
-    const options = {
-      method: "POST",
-      headers: {
-        Authorization: token,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    };
+    const options = makeOptions("POST", payload);
 
     // Use try/catch/finally logic to push todo onto AirTable
     try {
       setIsSaving(true);
 
-      // Send todo to server using fetch
-      const resp = await fetch(url, options);
-
-      // Throw an error if we don't receive an adequate response
-      if (!resp.ok) {
-        throw new Error(resp.message);
-      }
-
-      // Destructure records out of the response
-      const { records } = await resp.json();
+      // Obtain records from data
+      const records = await fetchRecords(options);
 
       // Create todo object from returned records, which only holds one object
       const savedTodo = {
@@ -140,9 +181,7 @@ function App() {
       // Finally, update todoList with this new todo!
       setTodoList([...todoList, savedTodo]);
     } catch (error) {
-      // Log error and set error message to such
-      console.log(error.message);
-      setErrorMessage(error.message);
+      handleErrorMessage(error.message);
     } finally {
       setIsSaving(false);
     }
@@ -171,26 +210,15 @@ function App() {
     };
 
     // Create options object with "PATCH" method
-    const options = {
-      method: "PATCH",
-      headers: {
-        Authorization: token,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    };
+    const options = makeOptions("PATCH", payload);
 
     // Finally, implement the try/catch/finally block
     try {
       // Set isSaving to true
       setIsSaving(true);
-      // Send edited todo to server using fetch
-      const resp = await fetch(url, options);
 
-      // Throw an error if we don't receive an adequate response
-      if (!resp.ok) {
-        throw new Error(resp.message);
-      }
+      // Obtain records and check for errors
+      const records = await fetchRecords(options);
 
       // Once the database has been updated, we can update our UI with the changes
       const updatedTodos = todoList.map((todo) => {
@@ -200,9 +228,7 @@ function App() {
       // Set the current set of todos to the updated list
       setTodoList(updatedTodos);
     } catch (error) {
-      // Log error and set error message to such
-      console.log(error.message);
-      setErrorMessage(`${error.message}. Reverting todo...`);
+      handleErrorMessage(error.message);
 
       // Create a reverted todos list using the original todo
       const revertedTodos = { ...todoList, originalTodo };
@@ -238,26 +264,13 @@ function App() {
     };
 
     // Create options object with "PATCH" method
-    const options = {
-      method: "PATCH",
-      headers: {
-        Authorization: token,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    };
+    const options = makeOptions("PATCH", payload);
 
     // Finally, implement the try/catch/finally block
     try {
       // Set isSaving to true
       setIsSaving(true);
-      // Send completed todo to server using fetch
-      const resp = await fetch(url, options);
-
-      // Throw an error if we don't receive an adequate response
-      if (!resp.ok) {
-        throw new Error(resp.message);
-      }
+      const records = await fetchRecords(options);
 
       // Once the database has been updated, we can update our UI with the changes
       const updatedTodos = todoList.map((todo) => {
@@ -267,9 +280,7 @@ function App() {
       // Set the list to the new updated Todos
       setTodoList(updatedTodos);
     } catch (error) {
-      // Log error and set error message to such
-      console.log(error.message);
-      setErrorMessage(`${error.message}. Reverting todo...`);
+      handleErrorMessage(error.message);
 
       // Create a reverted todos list using the original todo
       const revertedTodos = { ...todoList, originalTodo };
