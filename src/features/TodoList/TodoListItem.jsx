@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TextInputWithLabel from "../../shared/TextInputWithLabel";
 
 function TodoListItem({ todo, onCompleteTodo, onUpdateTodo }) {
@@ -34,12 +34,21 @@ function TodoListItem({ todo, onCompleteTodo, onUpdateTodo }) {
     return;
   }
 
+  // Create a useEffect to cover an edge case where someone clicks an outdated todo immediately
+  useEffect(() => {
+    setWorkingTitle(todo.title);
+  }, [todo]);
+
   return (
     <li>
       <form onSubmit={handleUpdate}>
         {isEditing ? (
           <>
-            <TextInputWithLabel value={workingTitle} onChange={handleEdit} />
+            <TextInputWithLabel
+              elementId={todo.id}
+              value={workingTitle}
+              onChange={handleEdit}
+            />
             <button type="button" onClick={handleCancel}>
               Cancel
             </button>
