@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import "./App.css";
 
@@ -6,51 +6,313 @@ import TodoForm from "./features/TodoList/TodoForm.jsx";
 import TodoList from "./features/TodoList/TodoList.jsx";
 
 function App() {
+  // --------------- Fetch todos from Airtable --------------- //
+  const url = `https://api.airtable.com/v0/${import.meta.env.VITE_BASE_ID}/${import.meta.env.VITE_TABLE_NAME}`;
+  const token = `Bearer ${import.meta.env.VITE_PAT}`;
+
+  // --------------- State variables and updater functions --------------- //
+  // Todo List
   const [todoList, setTodoList] = useState([]);
 
-  // handler functions
-  function addTodo(title) {
-    const newTodo = {
-      title,
-      id: Date.now(),
-      isCompleted: false,
+  // State of data transfer to the AirTable API
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Error message for data transfer to AirTable API
+  const [errorMessage, setErrorMessage] = useState("");
+
+  // Tracks whether todo item is being saved to API
+  const [isSaving, setIsSaving] = useState(false);
+
+  // ---------------- Helper Functions ----------------------------- //
+  function makePayload(isCompleted, id = null, todo = null, title = null) {
+    // Back out title first if it is not given
+    if (!todo) {
+      todo = id
+        ? todoList.find((todoItem) => {
+            return todoItem.id === id;
+          })
+        : null;
+      if (!title) {
+        title = todo ? todo.title : title;
+      }
+    } else {
+      title = todo.title;
+      id = todo.id;
+    }
+
+    // Create payload object using the complete todo to be updated into the database
+    const payload = {
+      records: [
+        {
+          fields: {
+            title: title,
+            isCompleted: isCompleted,
+          },
+        },
+      ],
     };
 
-    setTodoList([...todoList, newTodo]);
-
-    return;
+    // Return the payload!
+    return payload;
   }
 
-  function updateTodo(editedTodo) {
-    const updatedTodos = todoList.map((todo) => {
-      return todo.id === editedTodo.id ? editedTodo : todo;
+  function makeOptions(methodUsed, payload = null) {
+    const options = {
+      method: methodUsed,
+      headers: {
+        Authorization: token,
+        "Content-Type": "application/json",
+      },
+    };
+
+    // If payload is specified, add it to options
+    if (payload) {
+      options.body = JSON.stringify(payload);
+    }
+
+    // Return options!
+    return options;
+  }
+
+  const fetchRecords = async (options) => {
+    // Send completed todo to server using fetch
+    const resp = await fetch(url, options);
+
+    // Throw an error if we don't receive an adequate response
+    if (!resp.ok) {
+      throw new Error(resp.message);
+    }
+
+    // If the above constraints are satisfied, return the records
+    const { records } = await resp.json();
+    return records;
+  };
+
+  function handleErrorMessage(errorMessage) {
+    console.log(errorMessage);
+    setErrorMessage(errorMessage);
+  }
+  // ---------------- Effects ------------------------- //
+
+  useEffect(() => {
+    const fetchTodos = async () => {
+      // Set isLoading to true; we are fetching data!
+      setIsLoading(true);
+
+      // Create options object with "GET" method
+      const options = makeOptions("GET");
+
+      // Create try/catch/finally block to handle fetch and raise errors if anything arises
+      try {
+        // Retrieve records from API
+        const records = await fetchRecords(options);
+
+        // Call the map method on data above to restructure data into how
+        // we have defined todos here
+        const retrievedTodoList = records.map((record) => {
+          const todo = {
+            id: record.id,
+            ...record.fields,
+          };
+
+          // isCompleted is either true or "", but we want "" to be set to false.
+          // Manually check the truthiness of the record.
+          if (!todo.isCompleted) {
+            todo.isCompleted = false;
+          }
+
+          // Return this version of the todo
+          return todo;
+        });
+
+        setTodoList(retrievedTodoList);
+      } catch (error) {
+        handleErrorMessage(error.message);
+        return;
+      } finally {
+        // The loading process is done, so set isLoading to false!
+        setIsLoading(false);
+        return;
+      }
+    };
+    fetchTodos();
+  }, []);
+  // --------------------------------------------------------- //
+  // handler functions
+
+  // DISCLAIMER FOR WEEK 9: Because the function below originally accepted titles
+  // (and its subsequent function usage assumes a title input), I am going to keep
+  // it as such and default isCompleted to false (which also makes sense given that
+  // if we are adding the todo to our list, it is an unfinished task).
+  const addTodo = async (newTodoTitle) => {
+    // Create payload, which here is an object that holds a records array with one todo
+    const payload = {
+      records: [
+        {
+          fields: {
+            title: newTodoTitle,
+            isCompleted: false,
+          },
+        }, // Holds one todo
+      ],
+    };
+
+    // Create an options object to hold parameters needed to push data into AirTable
+    const options = makeOptions("POST", payload);
+
+    // Use try/catch/finally logic to push todo onto AirTable
+    try {
+      setIsSaving(true);
+
+      // Obtain records from data
+      const records = await fetchRecords(options);
+
+      // Create todo object from returned records, which only holds one object
+      const savedTodo = {
+        id: records[0].id,
+        ...records[0].fields,
+      };
+
+      // Explicitly set isCompleted to false if it is not true
+      if (!records[0].fields.isCompleted) {
+        savedTodo.isCompleted = false;
+      }
+
+      // Finally, update todoList with this new todo!
+      setTodoList([...todoList, savedTodo]);
+    } catch (error) {
+      handleErrorMessage(error.message);
+    } finally {
+      setIsSaving(false);
+    }
+
+    return;
+  };
+
+  const updateTodo = async (editedTodo) => {
+    // Find and save the original Todo by iterating through the todoList
+    // with the Id of interest
+    const originalTodo = todoList.find((todo) => {
+      return todo.id === editedTodo.id;
     });
 
-    // Set the current set of todos to the updated list
-    setTodoList(updatedTodos);
+    // Create payload object using the edited todo to be updated into the database
+    const payload = {
+      records: [
+        {
+          id: editedTodo.id,
+          fields: {
+            title: editedTodo.title,
+            isCompleted: editedTodo.isCompleted,
+          },
+        },
+      ],
+    };
+
+    // Create options object with "PATCH" method
+    const options = makeOptions("PATCH", payload);
+
+    // Finally, implement the try/catch/finally block
+    try {
+      // Set isSaving to true
+      setIsSaving(true);
+
+      // Obtain records and check for errors
+      const records = await fetchRecords(options);
+
+      // Once the database has been updated, we can update our UI with the changes
+      const updatedTodos = todoList.map((todo) => {
+        return todo.id === editedTodo.id ? editedTodo : todo;
+      });
+
+      // Set the current set of todos to the updated list
+      setTodoList(updatedTodos);
+    } catch (error) {
+      handleErrorMessage(error.message);
+
+      // Create a reverted todos list using the original todo
+      const revertedTodos = { ...todoList, originalTodo };
+
+      // Finally, update state to original state
+      setTodoList([...revertedTodos]);
+    } finally {
+      setIsSaving(false);
+    }
+
     return;
-  }
+  };
 
   // helper function to complete todos
-  function completeTodo(id) {
-    const updatedTodos = todoList.map((todo) => {
-      return todo.id === id ? { ...todo, isCompleted: true } : todo;
+  const completeTodo = async (id) => {
+    // Find and save the original Todo by iterating through the todoList
+    // with the Id of interest
+    const originalTodo = todoList.find((todo) => {
+      return todo.id === id;
     });
 
-    // Set the list to the new updated Todos
-    setTodoList(updatedTodos);
+    // Create payload object using the complete todo to be updated into the database
+    const payload = {
+      records: [
+        {
+          id: id,
+          fields: {
+            title: originalTodo.title,
+            isCompleted: true,
+          },
+        },
+      ],
+    };
+
+    // Create options object with "PATCH" method
+    const options = makeOptions("PATCH", payload);
+
+    // Finally, implement the try/catch/finally block
+    try {
+      // Set isSaving to true
+      setIsSaving(true);
+      const records = await fetchRecords(options);
+
+      // Once the database has been updated, we can update our UI with the changes
+      const updatedTodos = todoList.map((todo) => {
+        return todo.id === id ? { ...todo, isCompleted: true } : todo;
+      });
+
+      // Set the list to the new updated Todos
+      setTodoList(updatedTodos);
+    } catch (error) {
+      handleErrorMessage(error.message);
+
+      // Create a reverted todos list using the original todo
+      const revertedTodos = { ...todoList, originalTodo };
+
+      // Update state to original state
+      setTodoList([...revertedTodos]);
+    } finally {
+      setIsSaving(false);
+    }
+
     return;
-  }
+  };
 
   return (
     <div>
       <h1>ToDo List</h1>
-      <TodoForm onAddTodo={addTodo} />
+      <TodoForm onAddTodo={addTodo} isSaving={isSaving} />
       <TodoList
         todoList={todoList}
         onCompleteTodo={completeTodo}
         onUpdateTodo={updateTodo}
+        isLoading={isLoading}
       />
+      {errorMessage ? (
+        <div>
+          <hr />
+          <p>{errorMessage}</p>
+          <button>Clear</button>
+        </div>
+      ) : (
+        <></>
+      )}
     </div>
   );
 }
