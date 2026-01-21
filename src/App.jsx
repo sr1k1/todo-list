@@ -4,12 +4,29 @@ import "./App.css";
 
 import TodoForm from "./features/TodoList/TodoForm.jsx";
 import TodoList from "./features/TodoList/TodoList.jsx";
+import TodosViewForm from "./features/TodoList/TodosViewForm.jsx";
+
+// --------------- Fetch todos from Airtable --------------- //
+const url = `https://api.airtable.com/v0/${import.meta.env.VITE_BASE_ID}/${import.meta.env.VITE_TABLE_NAME}`;
+const token = `Bearer ${import.meta.env.VITE_PAT}`;
+
+// Define utility function that encodes parameters needed to sort todos and update the above url
+function encodeUrl({ sortField, sortDirection, queryString }) {
+  // Create variable that will create the component of the query that will search based on keyword, ONLY
+  // if a queryString is provided
+  let searchQuery = "";
+
+  // Create the component of the query that deals with sorting the todos based on field and direction
+  let sortQuery = `sort[0][field]=${sortField}&sort[0][direction]=${sortDirection}`;
+
+  // If a queryString is passed in, update searchQuery with the appropriate keywords
+  if (queryString) {
+    searchQuery = `&filterByFormula=SEARCH("${queryString}",+title)`;
+  }
+  return encodeURI(`${url}?${sortQuery}${searchQuery}`);
+}
 
 function App() {
-  // --------------- Fetch todos from Airtable --------------- //
-  const url = `https://api.airtable.com/v0/${import.meta.env.VITE_BASE_ID}/${import.meta.env.VITE_TABLE_NAME}`;
-  const token = `Bearer ${import.meta.env.VITE_PAT}`;
-
   // --------------- State variables and updater functions --------------- //
   // Todo List
   const [todoList, setTodoList] = useState([]);
@@ -22,6 +39,13 @@ function App() {
 
   // Tracks whether todo item is being saved to API
   const [isSaving, setIsSaving] = useState(false);
+
+  // State variables storing the selected field and direction of sorting todos
+  const [sortField, setSortField] = useState("createdTime");
+  const [sortDirection, setSortDirection] = useState("desc");
+
+  // State variable storing search query
+  const [queryString, setQueryString] = useState("");
 
   // ---------------- Helper Functions ----------------------------- //
   function makePayload(isCompleted, id = null, todo = null, title = null) {
@@ -76,7 +100,10 @@ function App() {
 
   const fetchRecords = async (options) => {
     // Send completed todo to server using fetch
-    const resp = await fetch(url, options);
+    const resp = await fetch(
+      encodeUrl({ sortField, sortDirection, queryString }),
+      options,
+    );
 
     // Throw an error if we don't receive an adequate response
     if (!resp.ok) {
@@ -136,7 +163,7 @@ function App() {
       }
     };
     fetchTodos();
-  }, []);
+  }, [sortDirection, sortField, queryString]);
   // --------------------------------------------------------- //
   // handler functions
 
@@ -303,6 +330,15 @@ function App() {
         onCompleteTodo={completeTodo}
         onUpdateTodo={updateTodo}
         isLoading={isLoading}
+      />
+      <hr />
+      <TodosViewForm
+        sortDirection={sortDirection}
+        setSortDirection={setSortDirection}
+        sortField={sortField}
+        setSortField={setSortField}
+        queryString={queryString}
+        setQueryString={setQueryString}
       />
       {errorMessage ? (
         <div>
