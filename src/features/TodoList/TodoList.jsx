@@ -1,5 +1,7 @@
 import TodoListItem from "./TodoListItem";
 
+import styles from "./TodoList.module.css";
+
 function TodoList({ todoList, onCompleteTodo, onUpdateTodo, isLoading }) {
   // Create list of filtered todos that only have incomplete tasks.
   const filteredTodoList = todoList.filter((todo) => !todo.isCompleted);
@@ -11,7 +13,7 @@ function TodoList({ todoList, onCompleteTodo, onUpdateTodo, isLoading }) {
       <p>Add todo above to get started</p>
     )
   ) : (
-    <ul>
+    <ul className={styles.ulProps}>
       {filteredTodoList.map((todo) => (
         <TodoListItem
           key={todo.id}

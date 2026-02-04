@@ -1,4 +1,10 @@
 import { useState, useEffect } from "react";
+import styled from "styled-components";
+
+const StyledForm = styled.form`
+  display: flex;
+  gap: 30px;
+`;
 
 function TodosViewForm({
   sortDirection,
@@ -24,7 +30,7 @@ function TodosViewForm({
   }, [localQueryString, setQueryString]);
 
   return (
-    <form onSubmit={() => preventRefresh}>
+    <StyledForm onSubmit={() => preventRefresh}>
       <div>
         <label>Search todos: </label>
         <input
@@ -60,7 +66,7 @@ function TodosViewForm({
           <option value="asc">Ascending</option>
         </select>
       </div>
-    </form>
+    </StyledForm>
   );
 }
 
