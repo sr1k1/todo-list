@@ -1,11 +1,21 @@
-import { useState, useEffect, useCallback } from "react";
+// React hooks
+import { useState, useEffect, useCallback, useReducer } from "react";
 
-import "./App.css";
-import styles from "./App.module.css";
-
+// App components
 import TodoForm from "./features/TodoList/TodoForm.jsx";
 import TodoList from "./features/TodoList/TodoList.jsx";
 import TodosViewForm from "./features/TodoList/TodosViewForm.jsx";
+
+// Reducer components
+import {
+  reducer as todosReducer,
+  actions as todoActions,
+  initialState as initialTodosState,
+} from "./reducers/todos.reducer.js";
+
+// Style
+import "./App.css";
+import styles from "./App.module.css";
 
 // --------------- Fetch todos from Airtable --------------- //
 const url = `https://api.airtable.com/v0/${import.meta.env.VITE_BASE_ID}/${import.meta.env.VITE_TABLE_NAME}`;
@@ -13,17 +23,9 @@ const token = `Bearer ${import.meta.env.VITE_PAT}`;
 
 function App() {
   // --------------- State variables and updater functions --------------- //
-  // Todo List
-  const [todoList, setTodoList] = useState([]);
 
-  // State of data transfer to the AirTable API
-  const [isLoading, setIsLoading] = useState(false);
-
-  // Error message for data transfer to AirTable API
-  const [errorMessage, setErrorMessage] = useState("");
-
-  // Tracks whether todo item is being saved to API
-  const [isSaving, setIsSaving] = useState(false);
+  // todoList, isLoading, errorMessage, isSaving
+  const [todoState, dispatch] = useReducer(todosReducer, initialTodosState);
 
   // State variables storing the selected field and direction of sorting todos
   const [sortField, setSortField] = useState("createdTime");
@@ -52,37 +54,6 @@ function App() {
   }, [sortField, sortDirection, queryString]);
 
   // ---------------- Helper Functions ----------------------------- //
-  function makePayload(isCompleted, id = null, todo = null, title = null) {
-    // Back out title first if it is not given
-    if (!todo) {
-      todo = id
-        ? todoList.find((todoItem) => {
-            return todoItem.id === id;
-          })
-        : null;
-      if (!title) {
-        title = todo ? todo.title : title;
-      }
-    } else {
-      title = todo.title;
-      id = todo.id;
-    }
-
-    // Create payload object using the complete todo to be updated into the database
-    const payload = {
-      records: [
-        {
-          fields: {
-            title: title,
-            isCompleted: isCompleted,
-          },
-        },
-      ],
-    };
-
-    // Return the payload!
-    return payload;
-  }
 
   function makeOptions(methodUsed, payload = null) {
     const options = {
@@ -117,15 +88,14 @@ function App() {
   };
 
   function handleErrorMessage(errorMessage) {
-    console.log(errorMessage);
-    setErrorMessage(errorMessage);
+    dispatch({ type: todoActions.setLoadError, error: errorMessage });
   }
   // ---------------- Effects ------------------------- //
 
   useEffect(() => {
     const fetchTodos = async () => {
-      // Set isLoading to true; we are fetching data!
-      setIsLoading(true);
+      // Set isLoading to true via dispatch; we are fetching data!
+      dispatch({ type: todoActions.fetchTodos });
 
       // Create options object with "GET" method
       const options = makeOptions("GET");
@@ -135,31 +105,10 @@ function App() {
         // Retrieve records from API
         const records = await fetchRecords(options);
 
-        // Call the map method on data above to restructure data into how
-        // we have defined todos here
-        const retrievedTodoList = records.map((record) => {
-          const todo = {
-            id: record.id,
-            ...record.fields,
-          };
-
-          // isCompleted is either true or "", but we want "" to be set to false.
-          // Manually check the truthiness of the record.
-          if (!todo.isCompleted) {
-            todo.isCompleted = false;
-          }
-
-          // Return this version of the todo
-          return todo;
-        });
-
-        setTodoList(retrievedTodoList);
+        // Load todos into app
+        dispatch({ type: todoActions.loadTodos, records });
       } catch (error) {
         handleErrorMessage(error.message);
-        return;
-      } finally {
-        // The loading process is done, so set isLoading to false!
-        setIsLoading(false);
         return;
       }
     };
@@ -168,10 +117,6 @@ function App() {
   // --------------------------------------------------------- //
   // handler functions
 
-  // DISCLAIMER FOR WEEK 9: Because the function below originally accepted titles
-  // (and its subsequent function usage assumes a title input), I am going to keep
-  // it as such and default isCompleted to false (which also makes sense given that
-  // if we are adding the todo to our list, it is an unfinished task).
   const addTodo = async (newTodoTitle) => {
     // Create payload, which here is an object that holds a records array with one todo
     const payload = {
@@ -190,28 +135,19 @@ function App() {
 
     // Use try/catch/finally logic to push todo onto AirTable
     try {
-      setIsSaving(true);
+      // Start request by setting isSaving to true
+      dispatch({ type: todoActions.startRequest });
 
       // Obtain records from data
       const records = await fetchRecords(options);
 
-      // Create todo object from returned records, which only holds one object
-      const savedTodo = {
-        id: records[0].id,
-        ...records[0].fields,
-      };
-
-      // Explicitly set isCompleted to false if it is not true
-      if (!records[0].fields.isCompleted) {
-        savedTodo.isCompleted = false;
-      }
-
-      // Finally, update todoList with this new todo!
-      setTodoList([...todoList, savedTodo]);
+      // Display added todo on UI
+      dispatch({ type: todoActions.addTodo, records });
     } catch (error) {
       handleErrorMessage(error.message);
     } finally {
-      setIsSaving(false);
+      // Set isSaving and isLoading to false.
+      dispatch({ type: todoActions.endRequest });
     }
 
     return;
@@ -220,7 +156,7 @@ function App() {
   const updateTodo = async (editedTodo) => {
     // Find and save the original Todo by iterating through the todoList
     // with the Id of interest
-    const originalTodo = todoList.find((todo) => {
+    const originalTodo = todoState.todoList.find((todo) => {
       return todo.id === editedTodo.id;
     });
 
@@ -243,28 +179,20 @@ function App() {
     // Finally, implement the try/catch/finally block
     try {
       // Set isSaving to true
-      setIsSaving(true);
+      dispatch({ type: todoActions.startRequest });
 
       // Obtain records and check for errors
       const records = await fetchRecords(options);
 
-      // Once the database has been updated, we can update our UI with the changes
-      const updatedTodos = todoList.map((todo) => {
-        return todo.id === editedTodo.id ? editedTodo : todo;
-      });
-
-      // Set the current set of todos to the updated list
-      setTodoList(updatedTodos);
+      // Update UI with updated todos
+      dispatch({ type: todoActions.updateTodo, editedTodo });
     } catch (error) {
       handleErrorMessage(error.message);
 
-      // Create a reverted todos list using the original todo
-      const revertedTodos = { ...todoList, originalTodo };
-
-      // Finally, update state to original state
-      setTodoList([...revertedTodos]);
+      // Revert todos on UI in event of an error
+      dispatch({ type: todoActions.revertTodo, originalTodo });
     } finally {
-      setIsSaving(false);
+      dispatch({ type: todoActions.endRequest });
     }
 
     return;
@@ -274,7 +202,7 @@ function App() {
   const completeTodo = async (id) => {
     // Find and save the original Todo by iterating through the todoList
     // with the Id of interest
-    const originalTodo = todoList.find((todo) => {
+    const originalTodo = todoState.todoList.find((todo) => {
       return todo.id === id;
     });
 
@@ -297,26 +225,19 @@ function App() {
     // Finally, implement the try/catch/finally block
     try {
       // Set isSaving to true
-      setIsSaving(true);
+      dispatch({ type: todoActions.startRequest });
+
       const records = await fetchRecords(options);
 
-      // Once the database has been updated, we can update our UI with the changes
-      const updatedTodos = todoList.map((todo) => {
-        return todo.id === id ? { ...todo, isCompleted: true } : todo;
-      });
-
-      // Set the list to the new updated Todos
-      setTodoList(updatedTodos);
+      // Update UI with all todos (including completed ones)
+      dispatch({ type: todoActions.completeTodo, id });
     } catch (error) {
       handleErrorMessage(error.message);
 
       // Create a reverted todos list using the original todo
-      const revertedTodos = { ...todoList, originalTodo };
-
-      // Update state to original state
-      setTodoList([...revertedTodos]);
+      dispatch({ type: todoActions.revertTodo, originalTodo });
     } finally {
-      setIsSaving(false);
+      dispatch({ type: todoActions.endRequest });
     }
 
     return;
@@ -326,12 +247,12 @@ function App() {
     <div className={styles.appOrientation}>
       <div>
         <h1>ToDo List</h1>
-        <TodoForm onAddTodo={addTodo} isSaving={isSaving} />
+        <TodoForm onAddTodo={addTodo} isSaving={todoState.isSaving} />
         <TodoList
-          todoList={todoList}
+          todoList={todoState.todoList}
           onCompleteTodo={completeTodo}
           onUpdateTodo={updateTodo}
-          isLoading={isLoading}
+          isLoading={todoState.isLoading}
         />
         <hr />
         <TodosViewForm
@@ -342,11 +263,17 @@ function App() {
           queryString={queryString}
           setQueryString={setQueryString}
         />
-        {errorMessage ? (
+        {todoState.errorMessage ? (
           <div className={styles.errorMessage}>
             <hr />
-            <p>{errorMessage}</p>
-            <button>Clear</button>
+            <p>{todoState.errorMessage}</p>
+            <button
+              onClick={() => {
+                dispatch({ type: todoActions.clearError });
+              }}
+            >
+              Clear
+            </button>
           </div>
         ) : (
           <></>
