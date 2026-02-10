@@ -1,0 +1,10 @@
+.appOrientation {
+  display: flex;
+  justify-self: center;
+}
+
+.errorMessage {
+  /* Create border */
+  border: 3px solid #f50000;
+  border-radius: 8px;
+}

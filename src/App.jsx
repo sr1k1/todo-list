@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 import "./App.css";
+import styles from "./App.module.css";
 
 import TodoForm from "./features/TodoList/TodoForm.jsx";
 import TodoList from "./features/TodoList/TodoList.jsx";
@@ -322,33 +323,35 @@ function App() {
   };
 
   return (
-    <div>
-      <h1>ToDo List</h1>
-      <TodoForm onAddTodo={addTodo} isSaving={isSaving} />
-      <TodoList
-        todoList={todoList}
-        onCompleteTodo={completeTodo}
-        onUpdateTodo={updateTodo}
-        isLoading={isLoading}
-      />
-      <hr />
-      <TodosViewForm
-        sortDirection={sortDirection}
-        setSortDirection={setSortDirection}
-        sortField={sortField}
-        setSortField={setSortField}
-        queryString={queryString}
-        setQueryString={setQueryString}
-      />
-      {errorMessage ? (
-        <div>
-          <hr />
-          <p>{errorMessage}</p>
-          <button>Clear</button>
-        </div>
-      ) : (
-        <></>
-      )}
+    <div className={styles.appOrientation}>
+      <div>
+        <h1>ToDo List</h1>
+        <TodoForm onAddTodo={addTodo} isSaving={isSaving} />
+        <TodoList
+          todoList={todoList}
+          onCompleteTodo={completeTodo}
+          onUpdateTodo={updateTodo}
+          isLoading={isLoading}
+        />
+        <hr />
+        <TodosViewForm
+          sortDirection={sortDirection}
+          setSortDirection={setSortDirection}
+          sortField={sortField}
+          setSortField={setSortField}
+          queryString={queryString}
+          setQueryString={setQueryString}
+        />
+        {errorMessage ? (
+          <div className={styles.errorMessage}>
+            <hr />
+            <p>{errorMessage}</p>
+            <button>Clear</button>
+          </div>
+        ) : (
+          <></>
+        )}
+      </div>
     </div>
   );
 }

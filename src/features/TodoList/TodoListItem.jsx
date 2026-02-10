@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
+
 import TextInputWithLabel from "../../shared/TextInputWithLabel";
+
+import styles from "./TodoListItem.module.css";
 
 function TodoListItem({ todo, onCompleteTodo, onUpdateTodo }) {
   // Create state variable to store whether a todo item is editable
@@ -40,7 +43,7 @@ function TodoListItem({ todo, onCompleteTodo, onUpdateTodo }) {
   }, [todo]);
 
   return (
-    <li>
+    <li className={styles.liProps}>
       <form onSubmit={handleUpdate}>
         {isEditing ? (
           <>
