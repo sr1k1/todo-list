@@ -13,6 +13,12 @@ import {
   initialState as initialTodosState,
 } from "./reducers/todos.reducer.js";
 
+// Helper functions
+import {
+  makeOptions,
+  fetchRecords,
+} from "./features/TodoList/HelperFunctions.js";
+
 // Style
 import "./App.css";
 import styles from "./App.module.css";
@@ -22,17 +28,8 @@ const url = `https://api.airtable.com/v0/${import.meta.env.VITE_BASE_ID}/${impor
 const token = `Bearer ${import.meta.env.VITE_PAT}`;
 
 function App() {
-  // --------------- State variables and updater functions --------------- //
-
-  // todoList, isLoading, errorMessage, isSaving
+  // --------------- State variable and updater function --------------- //
   const [todoState, dispatch] = useReducer(todosReducer, initialTodosState);
-
-  // State variables storing the selected field and direction of sorting todos
-  const [sortField, setSortField] = useState("createdTime");
-  const [sortDirection, setSortDirection] = useState("desc");
-
-  // State variable storing search query
-  const [queryString, setQueryString] = useState("");
 
   // ---------------- Variables ------------------ //
 
@@ -44,52 +41,15 @@ function App() {
     let searchQuery = "";
 
     // Create the component of the query that deals with sorting the todos based on field and direction
-    let sortQuery = `sort[0][field]=${sortField}&sort[0][direction]=${sortDirection}`;
+    let sortQuery = `sort[0][field]=${todoState.sortField}&sort[0][direction]=${todoState.sortDirection}`;
 
     // If a queryString is passed in, update searchQuery with the appropriate keywords
-    if (queryString) {
-      searchQuery = `&filterByFormula=SEARCH("${queryString}",+title)`;
+    if (todoState.queryString) {
+      searchQuery = `&filterByFormula=SEARCH("${todoState.queryString}",+title)`;
     }
     return encodeURI(`${url}?${sortQuery}${searchQuery}`);
-  }, [sortField, sortDirection, queryString]);
+  }, [todoState.sortField, todoState.sortDirection, todoState.queryString]);
 
-  // ---------------- Helper Functions ----------------------------- //
-
-  function makeOptions(methodUsed, payload = null) {
-    const options = {
-      method: methodUsed,
-      headers: {
-        Authorization: token,
-        "Content-Type": "application/json",
-      },
-    };
-
-    // If payload is specified, add it to options
-    if (payload) {
-      options.body = JSON.stringify(payload);
-    }
-
-    // Return options!
-    return options;
-  }
-
-  const fetchRecords = async (options) => {
-    // Send completed todo to server using fetch
-    const resp = await fetch(encodeUrl(), options);
-
-    // Throw an error if we don't receive an adequate response
-    if (!resp.ok) {
-      throw new Error(resp.message);
-    }
-
-    // If the above constraints are satisfied, return the records
-    const { records } = await resp.json();
-    return records;
-  };
-
-  function handleErrorMessage(errorMessage) {
-    dispatch({ type: todoActions.setLoadError, error: errorMessage });
-  }
   // ---------------- Effects ------------------------- //
 
   useEffect(() => {
@@ -98,22 +58,22 @@ function App() {
       dispatch({ type: todoActions.fetchTodos });
 
       // Create options object with "GET" method
-      const options = makeOptions("GET");
+      const options = makeOptions("GET", token);
 
       // Create try/catch/finally block to handle fetch and raise errors if anything arises
       try {
         // Retrieve records from API
-        const records = await fetchRecords(options);
+        const records = await fetchRecords(options, encodeUrl);
 
         // Load todos into app
         dispatch({ type: todoActions.loadTodos, records });
       } catch (error) {
-        handleErrorMessage(error.message);
+        dispatch({ type: todoActions.setLoadError, error });
         return;
       }
     };
     fetchTodos();
-  }, [sortDirection, sortField, queryString]);
+  }, [todoState.sortDirection, todoState.sortField, todoState.queryString]);
   // --------------------------------------------------------- //
   // handler functions
 
@@ -131,7 +91,7 @@ function App() {
     };
 
     // Create an options object to hold parameters needed to push data into AirTable
-    const options = makeOptions("POST", payload);
+    const options = makeOptions("POST", token, payload);
 
     // Use try/catch/finally logic to push todo onto AirTable
     try {
@@ -139,12 +99,12 @@ function App() {
       dispatch({ type: todoActions.startRequest });
 
       // Obtain records from data
-      const records = await fetchRecords(options);
+      const records = await fetchRecords(options, encodeUrl);
 
       // Display added todo on UI
       dispatch({ type: todoActions.addTodo, records });
     } catch (error) {
-      handleErrorMessage(error.message);
+      dispatch({ type: todoActions.setLoadError, error });
     } finally {
       // Set isSaving and isLoading to false.
       dispatch({ type: todoActions.endRequest });
@@ -174,7 +134,7 @@ function App() {
     };
 
     // Create options object with "PATCH" method
-    const options = makeOptions("PATCH", payload);
+    const options = makeOptions("PATCH", token, payload);
 
     // Finally, implement the try/catch/finally block
     try {
@@ -182,12 +142,12 @@ function App() {
       dispatch({ type: todoActions.startRequest });
 
       // Obtain records and check for errors
-      const records = await fetchRecords(options);
+      const records = await fetchRecords(options, encodeUrl);
 
       // Update UI with updated todos
       dispatch({ type: todoActions.updateTodo, editedTodo });
     } catch (error) {
-      handleErrorMessage(error.message);
+      dispatch({ type: todoActions.setLoadError, error });
 
       // Revert todos on UI in event of an error
       dispatch({ type: todoActions.revertTodo, originalTodo });
@@ -220,19 +180,19 @@ function App() {
     };
 
     // Create options object with "PATCH" method
-    const options = makeOptions("PATCH", payload);
+    const options = makeOptions("PATCH", token, payload);
 
     // Finally, implement the try/catch/finally block
     try {
       // Set isSaving to true
       dispatch({ type: todoActions.startRequest });
 
-      const records = await fetchRecords(options);
+      const records = await fetchRecords(options, encodeUrl);
 
       // Update UI with all todos (including completed ones)
       dispatch({ type: todoActions.completeTodo, id });
     } catch (error) {
-      handleErrorMessage(error.message);
+      dispatch({ type: todoActions.setLoadError, error });
 
       // Create a reverted todos list using the original todo
       dispatch({ type: todoActions.revertTodo, originalTodo });
@@ -256,12 +216,11 @@ function App() {
         />
         <hr />
         <TodosViewForm
-          sortDirection={sortDirection}
-          setSortDirection={setSortDirection}
-          sortField={sortField}
-          setSortField={setSortField}
-          queryString={queryString}
-          setQueryString={setQueryString}
+          sortDirection={todoState.sortDirection}
+          sortField={todoState.sortField}
+          queryString={todoState.queryString}
+          dispatch={dispatch}
+          actions={todoActions}
         />
         {todoState.errorMessage ? (
           <div className={styles.errorMessage}>

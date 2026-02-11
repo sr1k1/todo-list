@@ -10,6 +10,9 @@ const actions = {
   completeTodo: "completeTodo",
   revertTodo: "revertTodo",
   clearError: "clearError",
+  setSortField: "setSortField",
+  setSortDirection: "setSortDirection",
+  setQueryString: "setQueryString",
 };
 
 // Initial state of grouped state variables
@@ -18,6 +21,9 @@ const initialState = {
   isLoading: false, // State of data transfer to the AirTable API
   isSaving: false, // Tracks whether todo item is being saved to API
   errorMessage: "", // Error message for data transfer to AirTable API
+  sortField: "createdTime", // state variable storing field (time and title)
+  sortDirection: "desc", // state variable storing direction (ascending or descending)
+  queryString: "", // string used to filter todos
 };
 
 // Define reducer that will handle the state changes to the four parameters
@@ -63,7 +69,7 @@ function reducer(state = initialState, action) {
       // the server side
       return {
         ...state,
-        errorMessage: action.error,
+        errorMessage: action.error.message,
         isLoading: false,
       };
 
@@ -144,6 +150,26 @@ function reducer(state = initialState, action) {
       return {
         ...state,
         errorMessage: "",
+      };
+
+    // ================ Last of state variables ================ //
+    case actions.setSortField:
+      // set sortField to whatever is being selected by dropdown
+      return {
+        ...state,
+        sortField: action.event.target.value,
+      };
+    case actions.setSortDirection:
+      // set sortDirection to whatever is being selected by dropdown
+      return {
+        ...state,
+        sortDirection: action.event.target.value,
+      };
+    case actions.setQueryString:
+      // Set queryString to local query string
+      return {
+        ...state,
+        queryString: action.localQueryString,
       };
   }
 }

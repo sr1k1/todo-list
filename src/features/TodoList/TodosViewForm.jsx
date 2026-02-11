@@ -8,11 +8,10 @@ const StyledForm = styled.form`
 
 function TodosViewForm({
   sortDirection,
-  setSortDirection,
   sortField,
-  setSortField,
   queryString,
-  setQueryString,
+  dispatch,
+  actions,
 }) {
   // Create a local state for the query string
   const [localQueryString, setLocalQueryString] = useState(queryString);
@@ -20,14 +19,14 @@ function TodosViewForm({
   // Add delay...
   useEffect(() => {
     const debounce = setTimeout(() => {
-      setQueryString(localQueryString);
+      dispatch({ type: actions.setQueryString, localQueryString });
     }, 500);
 
     // Cleanup function to clear the timeout
     return () => {
       clearTimeout(debounce);
     };
-  }, [localQueryString, setQueryString]);
+  }, [localQueryString, dispatch]); // replaced setQueryString dispatch, which is now the global setter
 
   return (
     <StyledForm onSubmit={() => preventRefresh}>
@@ -49,7 +48,7 @@ function TodosViewForm({
         <select
           id="sortBy"
           onChange={(event) => {
-            setSortField(event.target.value);
+            dispatch({ type: actions.setSortField, event });
           }}
         >
           <option value="createdTime">Time added</option>
@@ -59,7 +58,7 @@ function TodosViewForm({
         <select
           id="Direction"
           onChange={(event) => {
-            setSortDirection(event.target.value);
+            dispatch({ type: actions.setSortDirection, event });
           }}
         >
           <option value="desc">Descending</option>
