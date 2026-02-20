@@ -1,5 +1,11 @@
 // React hooks
-import { useState, useEffect, useCallback, useReducer } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useReducer,
+  createContext,
+} from "react";
 
 // App components
 import TodoForm from "./features/TodoList/TodoForm.jsx";
@@ -26,6 +32,10 @@ import styles from "./App.module.css";
 // --------------- Fetch todos from Airtable --------------- //
 const url = `https://api.airtable.com/v0/${import.meta.env.VITE_BASE_ID}/${import.meta.env.VITE_TABLE_NAME}`;
 const token = `Bearer ${import.meta.env.VITE_PAT}`;
+
+// ---------------- Context for rest of the app -------------------- //
+// Create a Context object for the app
+export const appContext = createContext(null);
 
 function App() {
   // --------------- State variable and updater function --------------- //
@@ -204,41 +214,41 @@ function App() {
   };
 
   return (
-    <div className={styles.appOrientation}>
-      <div>
-        <h1>ToDo List</h1>
-        <TodoForm onAddTodo={addTodo} isSaving={todoState.isSaving} />
-        <TodoList
-          todoList={todoState.todoList}
-          onCompleteTodo={completeTodo}
-          onUpdateTodo={updateTodo}
-          isLoading={todoState.isLoading}
-        />
-        <hr />
-        <TodosViewForm
-          sortDirection={todoState.sortDirection}
-          sortField={todoState.sortField}
-          queryString={todoState.queryString}
-          dispatch={dispatch}
-          actions={todoActions}
-        />
-        {todoState.errorMessage ? (
-          <div className={styles.errorMessage}>
-            <hr />
-            <p>{todoState.errorMessage}</p>
-            <button
-              onClick={() => {
-                dispatch({ type: todoActions.clearError });
-              }}
-            >
-              Clear
-            </button>
-          </div>
-        ) : (
-          <></>
-        )}
+    <appContext.Provider value={{ dispatch, todoActions }}>
+      <div className={styles.appOrientation}>
+        <div>
+          <h1>ToDo List</h1>
+          <TodoForm onAddTodo={addTodo} isSaving={todoState.isSaving} />
+          <TodoList
+            todoList={todoState.todoList}
+            onCompleteTodo={completeTodo}
+            onUpdateTodo={updateTodo}
+            isLoading={todoState.isLoading}
+          />
+          <hr />
+          <TodosViewForm
+            sortDirection={todoState.sortDirection}
+            sortField={todoState.sortField}
+            queryString={todoState.queryString}
+          />
+          {todoState.errorMessage ? (
+            <div className={styles.errorMessage}>
+              <hr />
+              <p>{todoState.errorMessage}</p>
+              <button
+                onClick={() => {
+                  dispatch({ type: todoActions.clearError });
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          ) : (
+            <></>
+          )}
+        </div>
       </div>
-    </div>
+    </appContext.Provider>
   );
 }
 

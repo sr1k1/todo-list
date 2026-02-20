@@ -1,4 +1,10 @@
-import { useState, useEffect } from "react";
+// React hooks
+import { useState, useEffect, useContext } from "react";
+
+// Context
+import { appContext } from "../../App";
+
+// Style
 import styled from "styled-components";
 
 const StyledForm = styled.form`
@@ -6,20 +12,17 @@ const StyledForm = styled.form`
   gap: 30px;
 `;
 
-function TodosViewForm({
-  sortDirection,
-  sortField,
-  queryString,
-  dispatch,
-  actions,
-}) {
+function TodosViewForm({ sortDirection, sortField, queryString }) {
+  // import dispatch and actions from context
+  const { dispatch, todoActions } = useContext(appContext);
+
   // Create a local state for the query string
   const [localQueryString, setLocalQueryString] = useState(queryString);
 
   // Add delay...
   useEffect(() => {
     const debounce = setTimeout(() => {
-      dispatch({ type: actions.setQueryString, localQueryString });
+      dispatch({ type: todoActions.setQueryString, localQueryString });
     }, 500);
 
     // Cleanup function to clear the timeout
@@ -48,7 +51,7 @@ function TodosViewForm({
         <select
           id="sortBy"
           onChange={(event) => {
-            dispatch({ type: actions.setSortField, event });
+            dispatch({ type: todoActions.setSortField, event });
           }}
         >
           <option value="createdTime">Time added</option>
@@ -58,7 +61,7 @@ function TodosViewForm({
         <select
           id="Direction"
           onChange={(event) => {
-            dispatch({ type: actions.setSortDirection, event });
+            dispatch({ type: todoActions.setSortDirection, event });
           }}
         >
           <option value="desc">Descending</option>
