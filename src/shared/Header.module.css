@@ -1,0 +1,19 @@
+/* Classes */
+.active {
+  color: rgb(0, 121, 26);
+}
+
+.inactive {
+  color: black;
+}
+
+/* Elements in Classes*/
+.headerTitle {
+  text-align: center;
+}
+
+.headerNav {
+  display: flex;
+  justify-content: flex-end;
+  column-gap: 5px;
+}

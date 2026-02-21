@@ -1,10 +1,20 @@
 // React hooks
-import { useState, useEffect, useCallback, useReducer } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useReducer,
+  createContext,
+} from "react";
+
+// React router components
+import { useLocation, Routes, Route } from "react-router";
 
 // App components
-import TodoForm from "./features/TodoList/TodoForm.jsx";
-import TodoList from "./features/TodoList/TodoList.jsx";
-import TodosViewForm from "./features/TodoList/TodosViewForm.jsx";
+import Header from "./shared/Header.jsx";
+import TodosPage from "./pages/TodosPage.jsx";
+import About from "./pages/About.jsx";
+import NotFound from "./pages/NotFound.jsx";
 
 // Reducer components
 import {
@@ -27,9 +37,31 @@ import styles from "./App.module.css";
 const url = `https://api.airtable.com/v0/${import.meta.env.VITE_BASE_ID}/${import.meta.env.VITE_TABLE_NAME}`;
 const token = `Bearer ${import.meta.env.VITE_PAT}`;
 
+// ---------------- Context for rest of the app -------------------- //
+// Create a Context object for the app
+export const appContext = createContext(null);
+
 function App() {
   // --------------- State variable and updater function --------------- //
   const [todoState, dispatch] = useReducer(todosReducer, initialTodosState);
+  const [title, setTitle] = useState("");
+
+  // Use location of app to set title
+  // Current location of app
+  const location = useLocation();
+
+  useEffect(() => {
+    switch (location.pathname) {
+      case "/":
+        setTitle("Todo List");
+        break;
+      case "/about":
+        setTitle("About");
+        break;
+      default:
+        setTitle("Not Found");
+    }
+  }, [location]);
 
   // ---------------- Variables ------------------ //
 
@@ -204,41 +236,43 @@ function App() {
   };
 
   return (
-    <div className={styles.appOrientation}>
-      <div>
-        <h1>ToDo List</h1>
-        <TodoForm onAddTodo={addTodo} isSaving={todoState.isSaving} />
-        <TodoList
-          todoList={todoState.todoList}
-          onCompleteTodo={completeTodo}
-          onUpdateTodo={updateTodo}
-          isLoading={todoState.isLoading}
-        />
-        <hr />
-        <TodosViewForm
-          sortDirection={todoState.sortDirection}
-          sortField={todoState.sortField}
-          queryString={todoState.queryString}
-          dispatch={dispatch}
-          actions={todoActions}
-        />
-        {todoState.errorMessage ? (
-          <div className={styles.errorMessage}>
-            <hr />
-            <p>{todoState.errorMessage}</p>
-            <button
-              onClick={() => {
-                dispatch({ type: todoActions.clearError });
-              }}
-            >
-              Clear
-            </button>
-          </div>
-        ) : (
-          <></>
-        )}
+    <appContext.Provider value={{ dispatch, todoActions }}>
+      <div className={styles.appOrientation}>
+        <div>
+          <Header title={title} />
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <TodosPage
+                  todoState={todoState}
+                  addTodo={addTodo}
+                  completeTodo={completeTodo}
+                  updateTodo={updateTodo}
+                />
+              }
+            />
+            <Route path="/about" element={<About />} />
+            <Route path="/*" element={<NotFound />} />
+          </Routes>
+          {todoState.errorMessage ? (
+            <div className={styles.errorMessage}>
+              <hr />
+              <p>{todoState.errorMessage}</p>
+              <button
+                onClick={() => {
+                  dispatch({ type: todoActions.clearError });
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          ) : (
+            <></>
+          )}
+        </div>
       </div>
-    </div>
+    </appContext.Provider>
   );
 }
 
